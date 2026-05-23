@@ -73,3 +73,62 @@ def run_bash(command):
         return "timeout - kommandot tog för lång tid"
     except Exception as e:
         return f"fel: {str(e)}"
+
+
+def react_loop(user_input):
+    # bygger upp historiken med system-prompt och användarens fråga
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_input},
+    ]
+
+    max_iterations = 10
+
+    for i in range(max_iterations):
+        print(f"\n--- iteration {i+1} ---")
+
+        # anropar modellen
+        response = call_llm(messages)
+        print(response)
+
+        # kollar om modellen är klar
+        final_answer = parse_final_answer(response)
+        if final_answer:
+            print(f"\nsvar: {final_answer}")
+            return
+
+        # parsar ut vilket verktyg modellen vill använda
+        action, action_input = parse_action(response)
+
+        if not action or not action_input:
+            print("kunde inte parsa action, avslutar")
+            break
+
+        # kör bash om det är det modellen vill
+        if action.lower() == "bash":
+            observation = run_bash(action_input)
+        else:
+            observation = f"okänt verktyg: {action}"
+
+        print(f"\nobservation: {observation}")
+
+        # lägger till modellens svar och observationen i historiken
+        messages.append({"role": "assistant", "content": response})
+        messages.append({"role": "user", "content": f"Observation: {observation}"})
+
+    print("max iterationer nådda")
+
+
+def main():
+    print("react agent del 1 - skriv 'quit' för att avsluta\n")
+    while True:
+        user_input = input("du: ").strip()
+        if user_input.lower() == "quit":
+            break
+        if not user_input:
+            continue
+        react_loop(user_input)
+
+
+if __name__ == "__main__":
+    main()
