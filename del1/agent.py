@@ -44,3 +44,32 @@ def parse_action(text):
             action_input = line.replace("Action Input:", "").strip()
 
     return action, action_input
+
+
+def parse_final_answer(text):
+    # kollar om modellen är klar och har ett slutsvar
+    for line in text.strip().split("\n"):
+        if line.startswith("Final Answer:"):
+            return line.replace("Final Answer:", "").strip()
+    return None
+
+
+def run_bash(command):
+    # frågar användaren om det är okej att köra kommandot
+    print(f"\n[BASH] agenten vill köra: {command}")
+    confirm = input("tillåt? (y/n): ").strip().lower()
+
+    if confirm != "y":
+        return "kommando nekades av användaren"
+
+    try:
+        result = subprocess.run(
+            command, shell=True, capture_output=True, text=True, timeout=30
+        )
+        output = result.stdout + result.stderr
+        # kapper outputen så att contexten inte blir för stor
+        return output[:2000] if output else "(inget output)"
+    except subprocess.TimeoutExpired:
+        return "timeout - kommandot tog för lång tid"
+    except Exception as e:
+        return f"fel: {str(e)}"
