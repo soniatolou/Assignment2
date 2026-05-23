@@ -1,0 +1,24 @@
+import os
+import subprocess
+from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ansluter till openai med api-nyckeln från .env
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# system-prompten som talar om för modellen vilket format den ska följa
+SYSTEM_PROMPT = """You are a ReAct agent that solves tasks step by step using bash commands.
+
+Always follow this EXACT format:
+
+Thought: <what you are thinking>
+Action: bash
+Action Input: <the exact bash command>
+
+When you have the final answer:
+Thought: I now know the answer
+Final Answer: <your answer>
+
+Never skip the Thought. Never combine steps."""
