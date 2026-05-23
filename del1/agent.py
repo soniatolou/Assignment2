@@ -22,3 +22,11 @@ Thought: I now know the answer
 Final Answer: <your answer>
 
 Never skip the Thought. Never combine steps."""
+
+
+def call_llm(messages):
+    # skickar hela konversationen till modellen och får tillbaka råtext
+    response = client.chat.completions.create(
+        model="gpt-4o-mini", messages=messages, max_tokens=1000, temperature=0
+    )
+    return response.choices[0].message.content
