@@ -30,3 +30,17 @@ def call_llm(messages):
         model="gpt-4o-mini", messages=messages, max_tokens=1000, temperature=0
     )
     return response.choices[0].message.content
+
+
+def parse_action(text):
+    # letar igenom texten rad för rad efter action och action input
+    action = None
+    action_input = None
+
+    for line in text.strip().split("\n"):
+        if line.startswith("Action:"):
+            action = line.replace("Action:", "").strip()
+        if line.startswith("Action Input:"):
+            action_input = line.replace("Action Input:", "").strip()
+
+    return action, action_input
