@@ -1,31 +1,25 @@
 import os
-from pyexpat.errors import messages
+import json
 import subprocess
+import yaml
 from openai import OpenAI
 from dotenv import load_dotenv
-from logger import setup_logger, log_event
 from safety import is_safe
+from logger import setup_logger, log_event
 
 load_dotenv()
 
-# ansluter till openai med api-nyckeln från .env
+# ansluter till openai
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# system-prompten som talar om för modellen vilket format den ska följa
-SYSTEM_PROMPT = """You are a ReAct agent that solves tasks step by step using bash commands.
+# läser in system-prompt och inställningar från config-filen
+def load_config():
+    with open("config.yaml", "r") as f:
+        return yaml.safe_load(f)
 
-Always follow this EXACT format:
-
-Thought: <what you are thinking>
-Action: bash
-Action Input: <the exact bash command>
-
-When you have the final answer:
-Thought: I now know the answer
-Final Answer: <your answer>
-
-Never skip the Thought. Never combine steps."""
-
+config = load_config()
+SYSTEM_PROMPT = config["system_prompt"]
+MAX_OUTPUT_CHARS = config["max_output_chars"]
 
 def call_llm(messages):
     # skickar hela konversationen till modellen och får tillbaka råtext
