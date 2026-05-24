@@ -56,6 +56,12 @@ def parse_final_answer(text):
 
 
 def run_bash(command):
+    # kollar säkerheten först innan vi ens frågar användaren
+    safe, reason = is_safe(command)
+    if not safe:
+        print(f"\n[BLOCKERAT] {reason}")
+        return f"kommando blockerades: {reason}"
+
     # frågar användaren om det är okej att köra kommandot
     print(f"\n[BASH] agenten vill köra: {command}")
     confirm = input("tillåt? (y/n): ").strip().lower()
