@@ -1,4 +1,5 @@
 import os
+from pyexpat.errors import messages
 import subprocess
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -91,34 +92,32 @@ def react_loop(user_input):
         response = call_llm(messages)
         print(response)
 
-        # kollar om modellen är klar
-        final_answer = parse_final_answer(response)
-        if final_answer:
-            print(f"\nsvar: {final_answer}")
-            return
-
         # parsar ut vilket verktyg modellen vill använda
         action, action_input = parse_action(response)
 
-        if not action or not action_input:
+        # om det finns en action, kör den först
+        if action and action_input:
+            if action.lower() == "bash":
+                observation = run_bash(action_input)
+            else:
+                observation = f"okänt verktyg: {action}"
+
+            print(f"\nobservation: {observation}")
+
+            messages.append({"role": "assistant", "content": response})
+            messages.append({"role": "user", "content": f"Observation: {observation}"})
+            continue
+
+            # kollar om modellen är klar, bara om ingen action hittades
+            final_answer = parse_final_answer(response)
+            if final_answer:
+                print(f"\nsvar: {final_answer}")
+                return
+
             print("kunde inte parsa action, avslutar")
             break
 
-        # kör bash om det är det modellen vill
-        if action.lower() == "bash":
-            observation = run_bash(action_input)
-        else:
-            observation = f"okänt verktyg: {action}"
-
-        print(f"\nobservation: {observation}")
-
-        # lägger till modellens svar och observationen i historiken
-        messages.append({"role": "assistant", "content": response})
-        messages.append({"role": "user", "content": f"Observation: {observation}"})
-
-    print("max iterationer nådda")
-
-
+            print("max iterationer nådda")
 def main():
     print("react agent del 1 - skriv 'quit' för att avsluta\n")
     while True:
