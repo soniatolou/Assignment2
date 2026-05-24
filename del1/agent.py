@@ -3,6 +3,8 @@ from pyexpat.errors import messages
 import subprocess
 from openai import OpenAI
 from dotenv import load_dotenv
+from logger import setup_logger, log_event
+from safety import is_safe
 
 load_dotenv()
 
@@ -82,8 +84,7 @@ def run_bash(command):
         return f"fel: {str(e)}"
 
 
-def react_loop(user_input):
-    # bygger upp historiken med system-prompt och användarens fråga
+def react_loop(user_input, log_file):
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_input},
@@ -94,14 +95,14 @@ def react_loop(user_input):
     for i in range(max_iterations):
         print(f"\n--- iteration {i+1} ---")
 
-        # anropar modellen
         response = call_llm(messages)
         print(response)
 
-        # parsar ut vilket verktyg modellen vill använda
+        # loggar modellens svar
+        log_event(log_file, "llm_response", {"iteration": i+1, "response": response})
+
         action, action_input = parse_action(response)
 
-        # om det finns en action, kör den först
         if action and action_input:
             if action.lower() == "bash":
                 observation = run_bash(action_input)
@@ -110,29 +111,42 @@ def react_loop(user_input):
 
             print(f"\nobservation: {observation}")
 
+            # loggar bash-anropet och resultatet
+            log_event(log_file, "tool_call", {
+                "iteration": i+1,
+                "action": action,
+                "action_input": action_input,
+                "observation": observation
+            })
+
             messages.append({"role": "assistant", "content": response})
             messages.append({"role": "user", "content": f"Observation: {observation}"})
             continue
 
-            # kollar om modellen är klar, bara om ingen action hittades
-            final_answer = parse_final_answer(response)
-            if final_answer:
-                print(f"\nsvar: {final_answer}")
-                return
+        final_answer = parse_final_answer(response)
+        if final_answer:
+            print(f"\nsvar: {final_answer}")
+            # loggar slutsvaret
+            log_event(log_file, "final_answer", {"answer": final_answer})
+            return
 
-            print("kunde inte parsa action, avslutar")
-            break
+        print("kunde inte parsa action, avslutar")
+        break
 
-            print("max iterationer nådda")
+    print("max iterationer nådda")
+
 def main():
-    print("react agent del 1 - skriv 'quit' för att avsluta\n")
+    log_file = setup_logger()
+    print(f"react agent del 1 - skriv 'quit' för att avsluta\n")
+    print(f"loggar sparas i: {log_file}\n")
     while True:
         user_input = input("du: ").strip()
         if user_input.lower() == "quit":
             break
         if not user_input:
             continue
-        react_loop(user_input)
+        log_event(log_file, "user_input", {"message": user_input})
+        react_loop(user_input, log_file)
 
 
 if __name__ == "__main__":
