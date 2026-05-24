@@ -1,6 +1,6 @@
 # lista med kommandon som alltid blockeras direkt
 BLOCKED_COMMANDS = [
-    "rm -rf",
+    "rm",
     "mkfs",
     "dd",
     "sudo",
