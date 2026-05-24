@@ -29,4 +29,4 @@ def log_event(log_file, event_type, data):
 
     # sparar tillbaka till filen
     with open(log_file, "w") as f:
-        json.dump(logs, f, indent=2, ensure_ascii=False)
+        json.dump(logs, f, indent=2, ensure_ascii=True)

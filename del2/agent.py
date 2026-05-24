@@ -12,10 +12,15 @@ load_dotenv()
 # ansluter till openai
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# läser in system-prompt och inställningar från config-filen
 def load_config():
     with open("config.yaml", "r") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+    
+    # läser in system-prompten från md-filen
+    with open(config["system_prompt_file"], "r") as f:
+        config["system_prompt"] = f.read()
+    
+    return config
 
 config = load_config()
 SYSTEM_PROMPT = config["system_prompt"]
