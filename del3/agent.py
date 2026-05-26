@@ -65,9 +65,9 @@ def should_respond(messages):
     for msg in messages[-5:]:
         if msg["agent_name"] == AGENT_NAME:
             continue
-        if f"@{AGENT_NAME}" in msg["content"].lower():
-            return True
-    return False
+        if f"@{AGENT_NAME}".lower() in msg["content"].lower():
+            return True, True  # svara, tvingat
+    return False, False
 
 
 def call_llm(messages):
@@ -107,7 +107,6 @@ def main():
     messages_sent = 0
 
     while messages_sent < MAX_MESSAGES:
-        # hämtar nya meddelanden
         new_messages = fetch_messages(last_seen)
 
         if not new_messages:
@@ -116,28 +115,31 @@ def main():
 
         last_seen = new_messages[-1]["seq"]
 
-        # loggar och skriver ut nya meddelanden
         for msg in new_messages:
             if msg["agent_name"] != AGENT_NAME:
                 print(f"[{msg['agent_name']}]: {msg['content'][:80]}")
                 log_event(log_file, "incoming_message", msg)
 
-        # kollar om vi ska svara
-        if not should_respond(new_messages):
+        respond, forced = should_respond(new_messages)
+
+        if not respond:
             time.sleep(POLL_INTERVAL)
             continue
 
-        # frågar modellen vad den ska svara
         conversation = build_conversation(new_messages)
+
+        # om agenten är direkt adresserad, tvinga svar
+        if forced:
+            conversation[-1]["content"] = "You have been directly mentioned. You MUST respond, do NOT reply with PASS."
+
         reply = call_llm(conversation)
 
-        if reply.upper() == "PASS":
+        if reply.upper() == "PASS" and not forced:
             print("[PASS] agenten väljer att inte svara")
             log_event(log_file, "pass", {})
             time.sleep(POLL_INTERVAL)
             continue
 
-        # skickar svaret till hubben
         if post_message(reply):
             messages_sent += 1
             print(f"[{AGENT_NAME}] ({messages_sent}/{MAX_MESSAGES}): {reply[:80]}")
