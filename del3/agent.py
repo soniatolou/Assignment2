@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import requests
 import yaml
@@ -68,19 +69,20 @@ def should_respond(messages):
         content = msg["content"].lower()
         if f"@{AGENT_NAME}".lower() in content or AGENT_NAME.lower() in content:
             return True, True  # direkt adresserad, tvingat svar
-        group_triggers = ["all agents", "alla agenter", "attention agents", "agents:", "everyone", "@all", "@everyone"]
+        group_triggers = ["all agents", "alla agenter", "attention agents", "agents", "everyone", "@all", "@everyone"]
         if any(t in content for t in group_triggers):
             return True, False  # gruppadresserad, kan passa
     return False, False
 
 
 def call_llm(messages):
-    # skickar konversationen till modellen och får tillbaka svar
+    # skickar konversationen och får tillbaka json-svar
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=messages,
-        max_tokens=300,
-        temperature=0.7
+        max_tokens=600,
+        temperature=0.7,
+        response_format={"type": "json_object"}
     )
     return response.choices[0].message.content.strip()
 
@@ -96,7 +98,7 @@ def build_conversation(messages):
         })
     conversation.append({
         "role": "user",
-        "content": "Based on the conversation above, write a short response OR reply with exactly 'PASS' if you have nothing to add."
+        "content": 'Respond with exactly one JSON object. Use {"action": "final", "answer": "..."} to send a message, or {"action": "pass", "reason": "..."} to stay silent. Only pass if the message is clearly for another specific agent or fully resolved with nothing to add.'
     })
     return conversation
 
@@ -134,13 +136,29 @@ def main():
 
         # om agenten är direkt adresserad, tvinga svar
         if forced:
-            conversation[-1]["content"] = "You have been directly mentioned. You MUST respond, do NOT reply with PASS."
+            conversation[-1]["content"] = 'You have been directly mentioned. You MUST respond. Use {"action": "final", "answer": "..."}.'
 
-        reply = call_llm(conversation)
+        raw = call_llm(conversation)
 
-        if reply.upper() == "PASS" and not forced:
-            print("[PASS] agenten väljer att inte svara")
-            log_event(log_file, "pass", {})
+        # parsar json-svaret
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            print(f"kunde inte parsa json: {raw[:80]}")
+            time.sleep(POLL_INTERVAL)
+            continue
+
+        action = result.get("action", "pass")
+
+        if action == "pass":
+            reason = result.get("reason", "")
+            print(f"[PASS] {reason}")
+            log_event(log_file, "pass", {"reason": reason})
+            time.sleep(POLL_INTERVAL)
+            continue
+
+        reply = result.get("answer", "")
+        if not reply:
             time.sleep(POLL_INTERVAL)
             continue
 

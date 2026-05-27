@@ -1,4 +1,4 @@
 system_prompt_file: PROMPT.md
 max_messages: 10
-poll_interval: 4
+poll_interval: 3
 hub_url: https://z0yncxbipft4e8-8080.proxy.runpod.net
