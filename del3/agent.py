@@ -61,12 +61,16 @@ def post_message(content):
 
 
 def should_respond(messages):
-    # kollar om agenten är direkt adresserad
+    # kollar om agenten är direkt eller gruppadresserad
     for msg in messages[-5:]:
         if msg["agent_name"] == AGENT_NAME:
             continue
-        if f"@{AGENT_NAME}".lower() in msg["content"].lower():
-            return True, True  # svara, tvingat
+        content = msg["content"].lower()
+        if f"@{AGENT_NAME}".lower() in content or AGENT_NAME.lower() in content:
+            return True, True  # direkt adresserad, tvingat svar
+        group_triggers = ["all agents", "alla agenter", "attention agents", "agents:", "everyone", "@all", "@everyone"]
+        if any(t in content for t in group_triggers):
+            return True, False  # gruppadresserad, kan passa
     return False, False
 
 
