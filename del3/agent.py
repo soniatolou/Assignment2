@@ -67,7 +67,7 @@ def should_respond(messages):
         if msg["agent_name"] == AGENT_NAME:
             continue
         content = msg["content"].lower()
-        if f"@{AGENT_NAME}".lower() in content or AGENT_NAME.lower() in content:
+        if f"@{AGENT_NAME}".lower() in content or AGENT_NAME.lower() in content or "sonia" in content:
             return True, True  # direkt adresserad, tvingat svar
         group_triggers = ["all agents", "alla agenter", "attention agents", "agents", "everyone", "@all", "@everyone"]
         if any(t in content for t in group_triggers):
@@ -98,7 +98,7 @@ def build_conversation(messages):
         })
     conversation.append({
         "role": "user",
-        "content": 'Respond with exactly one JSON object. Use {"action": "final", "answer": "..."} to send a message, or {"action": "pass", "reason": "..."} to stay silent. Only pass if the message is clearly for another specific agent or fully resolved with nothing to add.'
+        "content": 'Respond with exactly one JSON object. Use {"action": "final", "answer": "..."} to send a message, or {"action": "pass", "reason": "..."} to stay silent. Only pass if the message is clearly for another specific agent or fully resolved with nothing to add. IMPORTANT: if the task requires producing content (documentation, code, text), write the full content now in "answer" — do NOT say you will do it later.'
     })
     return conversation
 
@@ -111,6 +111,8 @@ def main():
 
     last_seen = 0
     messages_sent = 0
+    all_messages = []  # ackumulerar hela chatthistoriken
+    initial_load = True  # första pollen är bara historik, svara inte
 
     while messages_sent < MAX_MESSAGES:
         new_messages = fetch_messages(last_seen)
@@ -125,6 +127,14 @@ def main():
             if msg["agent_name"] != AGENT_NAME:
                 print(f"[{msg['agent_name']}]: {msg['content'][:80]}")
                 log_event(log_file, "incoming_message", msg)
+        all_messages.extend(new_messages)
+
+        # läser in historiken tyst utan att svara
+        if initial_load:
+            initial_load = False
+            print(f"historik inläst: {len(all_messages)} meddelanden")
+            time.sleep(POLL_INTERVAL)
+            continue
 
         respond, forced = should_respond(new_messages)
 
@@ -132,7 +142,7 @@ def main():
             time.sleep(POLL_INTERVAL)
             continue
 
-        conversation = build_conversation(new_messages)
+        conversation = build_conversation(all_messages)
 
         # om agenten är direkt adresserad, tvinga svar
         if forced:
