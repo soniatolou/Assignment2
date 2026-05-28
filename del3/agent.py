@@ -62,8 +62,8 @@ def post_message(content):
 
 
 def should_respond(messages):
-    # kollar om agenten är direkt eller gruppadresserad
-    for msg in messages[-5:]:
+    # kollar alla nya meddelanden, inte bara de sista 5
+    for msg in messages:
         if msg["agent_name"] == AGENT_NAME:
             continue
         content = msg["content"].lower()
@@ -73,6 +73,20 @@ def should_respond(messages):
         if any(t in content for t in group_triggers):
             return True, False  # gruppadresserad, kan passa
     return False, False
+
+
+def is_too_similar(reply, all_messages):
+    # jämför svaret med agentens senaste egna meddelande
+    own = [m["content"] for m in all_messages if m["agent_name"] == AGENT_NAME]
+    if not own:
+        return False
+    last = own[-1].lower()
+    words_last = set(last.split())
+    words_reply = set(reply.lower().split())
+    if not words_last:
+        return False
+    overlap = len(words_last & words_reply) / len(words_last)
+    return overlap > 0.7
 
 
 def call_llm(messages):
@@ -136,12 +150,13 @@ def main():
             time.sleep(POLL_INTERVAL)
             continue
 
-        # kolla om agenten är direkt adresserad
-        _, forced = should_respond(new_messages)
+        # kolla om agenten är direkt adresserad eller gruppadresserad
+        respond, forced = should_respond(new_messages)
 
-        # hoppa över om bara egna meddelanden kom in
-        only_own = all(m["agent_name"] == AGENT_NAME for m in new_messages)
-        if only_own:
+        # kalla llm även om en människa skriver, även utan trigger
+        human_wrote = any(m["agent_name"].startswith("human:") for m in new_messages)
+
+        if not respond and not human_wrote:
             time.sleep(POLL_INTERVAL)
             continue
 
@@ -153,13 +168,19 @@ def main():
 
         raw = call_llm(conversation)
 
-        # parsar json-svaret
+        # parsar json-svaret, försöker en gång till om det misslyckas
         try:
             result = json.loads(raw)
         except json.JSONDecodeError:
-            print(f"kunde inte parsa json: {raw[:80]}")
-            time.sleep(POLL_INTERVAL)
-            continue
+            log_event(log_file, "json_error", {"raw": raw[:200]})
+            print(f"json-fel, försöker igen: {raw[:80]}")
+            raw = call_llm(conversation)
+            try:
+                result = json.loads(raw)
+            except json.JSONDecodeError:
+                print(f"json-fel igen, hoppar över: {raw[:80]}")
+                time.sleep(POLL_INTERVAL)
+                continue
 
         action = result.get("action", "pass")
 
@@ -172,6 +193,13 @@ def main():
 
         reply = result.get("answer", "")
         if not reply:
+            time.sleep(POLL_INTERVAL)
+            continue
+
+        # hoppa över om svaret liknar det senaste egna meddelandet
+        if is_too_similar(reply, all_messages):
+            print("[PASS] för likt senaste egna svaret")
+            log_event(log_file, "pass", {"reason": "too similar to last own message"})
             time.sleep(POLL_INTERVAL)
             continue
 
