@@ -136,9 +136,12 @@ def main():
             time.sleep(POLL_INTERVAL)
             continue
 
-        respond, forced = should_respond(new_messages)
+        # kolla om agenten är direkt adresserad
+        _, forced = should_respond(new_messages)
 
-        if not respond:
+        # hoppa över om bara egna meddelanden kom in
+        only_own = all(m["agent_name"] == AGENT_NAME for m in new_messages)
+        if only_own:
             time.sleep(POLL_INTERVAL)
             continue
 
