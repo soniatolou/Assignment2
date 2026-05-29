@@ -170,8 +170,8 @@ def main():
             time.sleep(POLL_INTERVAL)
             continue
 
-        # aktivera tystnad om gruppen ombeds vara tyst
-        if is_silence_command(new_messages):
+        # aktivera tystnad om gruppen ombeds vara tyst (bara under aktiv session)
+        if not initial_load and is_silence_command(new_messages):
             silenced = True
             print("[TYST] agenten tystades ned")
             log_event(log_file, "silenced", {})
