@@ -61,16 +61,35 @@ def post_message(content):
         return False
 
 
+GROUP_TRIGGERS = ["all agents", "alla agenter", "attention agents", "agents", "everyone", "@all", "@everyone"]
+SILENCE_WORDS = ["quiet", "stop", "tyst", "silence", "halt", "be quiet", "stop writing", "sluta skriva", "håll tyst", "pause"]
+
+
+def is_silence_command(messages):
+    # kollar om någon ber hela gruppen vara tyst
+    for msg in messages:
+        if msg["agent_name"] == AGENT_NAME:
+            continue
+        content = msg["content"].lower()
+        has_group = any(t in content for t in GROUP_TRIGGERS)
+        has_silence = any(w in content for w in SILENCE_WORDS)
+        if has_group and has_silence:
+            return True
+        # direkt tystnad-kommando utan grupptrigger
+        if has_silence and ("sonia" in content or AGENT_NAME.lower() in content):
+            return True
+    return False
+
+
 def should_respond(messages):
-    # kollar alla nya meddelanden, inte bara de sista 5
+    # kollar alla nya meddelanden
     for msg in messages:
         if msg["agent_name"] == AGENT_NAME:
             continue
         content = msg["content"].lower()
         if f"@{AGENT_NAME}".lower() in content or AGENT_NAME.lower() in content or "sonia" in content:
             return True, True  # direkt adresserad, tvingat svar
-        group_triggers = ["all agents", "alla agenter", "attention agents", "agents", "everyone", "@all", "@everyone"]
-        if any(t in content for t in group_triggers):
+        if any(t in content for t in GROUP_TRIGGERS):
             return True, False  # gruppadresserad, kan passa
     return False, False
 
@@ -127,6 +146,7 @@ def main():
     messages_sent = 0
     all_messages = []  # ackumulerar hela chatthistoriken
     initial_load = True  # första pollen är bara historik, svara inte
+    silenced = False  # sätts till true om gruppen ombeds vara tyst
 
     while messages_sent < MAX_MESSAGES:
         new_messages = fetch_messages(last_seen)
@@ -150,8 +170,28 @@ def main():
             time.sleep(POLL_INTERVAL)
             continue
 
-        # kolla om agenten är direkt adresserad eller gruppadresserad
+        # aktivera tystnad om gruppen ombeds vara tyst
+        if is_silence_command(new_messages):
+            silenced = True
+            print("[TYST] agenten tystades ned")
+            log_event(log_file, "silenced", {})
+
+        # kolla om agenten är direkt adresserad
         respond, forced = should_respond(new_messages)
+
+        # en människa som direkt adresserar agenten häver tystnaden
+        direct_from_human = any(
+            m["agent_name"].startswith("human:") and
+            ("sonia" in m["content"].lower() or AGENT_NAME.lower() in m["content"].lower())
+            for m in new_messages
+        )
+        if direct_from_human:
+            silenced = False
+
+        # var tyst om silenced är satt, oavsett vad andra agenter säger
+        if silenced:
+            time.sleep(POLL_INTERVAL)
+            continue
 
         # kalla llm även om en människa skriver, även utan trigger
         human_wrote = any(m["agent_name"].startswith("human:") for m in new_messages)
