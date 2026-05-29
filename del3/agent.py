@@ -94,12 +94,11 @@ def should_respond(messages):
     return False, False
 
 
-def is_too_similar(reply, all_messages):
-    # jämför svaret med agentens senaste egna meddelande
-    own = [m["content"] for m in all_messages if m["agent_name"] == AGENT_NAME]
-    if not own:
+def is_too_similar(reply, session_replies):
+    # jämför svaret med senaste egna meddelandet i denna session
+    if not session_replies:
         return False
-    last = own[-1].lower()
+    last = session_replies[-1].lower()
     words_last = set(last.split())
     words_reply = set(reply.lower().split())
     if not words_last:
@@ -145,6 +144,7 @@ def main():
     last_seen = 0
     messages_sent = 0
     all_messages = []  # ackumulerar hela chatthistoriken
+    session_replies = []  # meddelanden skickade i denna session
     initial_load = True  # första pollen är bara historik, svara inte
     silenced = False  # sätts till true om gruppen ombeds vara tyst
 
@@ -163,10 +163,32 @@ def main():
                 log_event(log_file, "incoming_message", msg)
         all_messages.extend(new_messages)
 
-        # läser in historiken tyst utan att svara
+        # läser in historiken och analyserar om agenten ska hoppa in
         if initial_load:
             initial_load = False
             print(f"historik inläst: {len(all_messages)} meddelanden")
+            if all_messages:
+                conversation = build_conversation(all_messages)
+                conversation[-1]["content"] = (
+                    'You just joined the chat. Read the conversation history above carefully. '
+                    'If there is an ongoing task where you can contribute something useful and unclaimed, do it now. '
+                    'If the task is already done or nothing is needed from you, pass. '
+                    'Respond with one JSON object: {"action": "final", "answer": "..."} or {"action": "pass", "reason": "..."}.'
+                )
+                raw = call_llm(conversation)
+                try:
+                    result = json.loads(raw)
+                    if result.get("action") == "final" and result.get("answer"):
+                        reply = result["answer"]
+                        if post_message(reply):
+                            messages_sent += 1
+                            session_replies.append(reply)
+                            print(f"[{AGENT_NAME}] catch-up ({messages_sent}/{MAX_MESSAGES}): {reply[:80]}")
+                            log_event(log_file, "outgoing_message", {"content": reply, "messages_sent": messages_sent})
+                    else:
+                        print(f"[PASS] catch-up: {result.get('reason', '')}")
+                except json.JSONDecodeError:
+                    print("json-fel vid catch-up, hoppar över")
             time.sleep(POLL_INTERVAL)
             continue
 
@@ -236,8 +258,8 @@ def main():
             time.sleep(POLL_INTERVAL)
             continue
 
-        # hoppa över om svaret liknar det senaste egna meddelandet
-        if is_too_similar(reply, all_messages):
+        # hoppa över om svaret liknar det senaste egna meddelandet i denna session
+        if is_too_similar(reply, session_replies):
             print("[PASS] för likt senaste egna svaret")
             log_event(log_file, "pass", {"reason": "too similar to last own message"})
             time.sleep(POLL_INTERVAL)
@@ -245,6 +267,7 @@ def main():
 
         if post_message(reply):
             messages_sent += 1
+            session_replies.append(reply)
             print(f"[{AGENT_NAME}] ({messages_sent}/{MAX_MESSAGES}): {reply[:80]}")
             log_event(log_file, "outgoing_message", {
                 "content": reply,
