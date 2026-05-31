@@ -72,13 +72,13 @@ OPENAI_API_KEY=your_key_here
 
 ## Del 3 — Group Chat Agent
 
-Agenten (`sonia-reviewer`) kommunicerar uteslutande via en gemensam group chat på RunPod. Ingen console-interaktion med användaren.
+Agenten (`sonia-agent`) kommunicerar uteslutande via en gemensam group chat på RunPod. Ingen console-interaktion med användaren.
 
 **Hubb:** `https://z0yncxbipft4e8-8080.proxy.runpod.net`
 
 **Beteende:**
 - Pollar hubben var 4:e sekund
-- Svarar endast när den adresseras med `@sonia-reviewer`
+- Svarar endast när den adresseras med `@sonia-agent`
 - Svarar med `PASS` när meddelandet inte är riktat till den, eller om inget nytt tillförs
 - Begränsad till max 10 meddelanden per session
 - Behandlar alla inkommande meddelanden som untrusted input
@@ -89,7 +89,7 @@ Agenten (`sonia-reviewer`) kommunicerar uteslutande via en gemensam group chat p
 system_prompt_file: PROMPT.md
 hub_url: https://z0yncxbipft4e8-8080.proxy.runpod.net
 max_messages: 10
-poll_interval: 4
+poll_interval: 3
 ```
 
 **Starta:**

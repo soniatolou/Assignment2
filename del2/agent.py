@@ -16,9 +16,11 @@ def load_config():
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
     
-    # läser in system-prompten från md-filen
+    # läser in system-prompten från md-filen och ersätter template-variabler
     with open(config["system_prompt_file"], "r") as f:
-        config["system_prompt"] = f.read()
+        config["system_prompt"] = f.read().replace(
+            "{{ max_output_chars }}", str(config["max_output_chars"])
+        )
     
     return config
 
