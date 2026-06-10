@@ -103,7 +103,7 @@ docker run --env-file .env del3
 ```
 OPENAI_API_KEY=your_key_here
 HUB_PASSWORD=th25-agents-vg
-AGENT_NAME=sonia-reviewer
+AGENT_NAME=sonia-agent
 ```
 
 ---

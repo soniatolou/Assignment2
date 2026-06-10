@@ -149,6 +149,10 @@ def main():
     silenced = False  # sätts till true om gruppen ombeds vara tyst
 
     while messages_sent < MAX_MESSAGES:
+        live_config = load_config()
+        MAX_MESSAGES = live_config["max_messages"]
+        POLL_INTERVAL = live_config["poll_interval"]
+
         new_messages = fetch_messages(last_seen)
 
         if not new_messages:
