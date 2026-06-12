@@ -87,11 +87,8 @@ def edit_file(filepath, old_str, new_str):
         return f"fel vid fileditering: {str(e)}"
 
 
-def react_loop(user_input, log_file):
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_input},
-    ]
+def react_loop(messages, user_input, log_file):
+    messages.append({"role": "user", "content": user_input})
 
     max_iterations = 10
 
@@ -115,6 +112,7 @@ def react_loop(user_input, log_file):
         if response.get("final_answer"):
             print(f"\nsvar: {response['final_answer']}")
             log_event(log_file, "final_answer", {"answer": response["final_answer"]})
+            messages.append({"role": "assistant", "content": response_text})
             return
 
         action = response.get("action")
@@ -156,6 +154,7 @@ def main():
     log_file = setup_logger()
     print("react agent del 2 - skriv 'quit' för att avsluta\n")
     print(f"loggar sparas i: {log_file}\n")
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     while True:
         user_input = input("du: ").strip()
         if user_input.lower() == "quit":
@@ -163,7 +162,7 @@ def main():
         if not user_input:
             continue
         log_event(log_file, "user_input", {"message": user_input})
-        react_loop(user_input, log_file)
+        react_loop(messages, user_input, log_file)
 
 
 if __name__ == "__main__":
